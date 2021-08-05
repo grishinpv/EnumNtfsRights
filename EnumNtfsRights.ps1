@@ -1,4 +1,6 @@
-﻿$pathList = @("$env:ProgramFiles",
+﻿$pathList = @("HKCU:\SOFTWARE",
+              "HKLM:\SOFTWARE",
+              "$env:ProgramFiles",
               "$env:ALLUSERSPROFILE",
               "$env:CommonProgramFiles",
               "${env:CommonProgramFiles(x86)}",
@@ -33,7 +35,7 @@ function _checkACL {
                 if ($group.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -in $sidref)  {
 
                     foreach ($right in $aclref) {
-                        if (($group.FileSystemRights -band $right) -eq $right ) {
+                        if ((($group.FileSystemRights -band $right) -eq $right ) -or (($group.RegistryRights -band $right) -eq $right )) {
                             $MatchedAccess += $right.ToString()
            
                         } 
@@ -75,19 +77,31 @@ Function CheckACLforPath {
     $lookupGroupSIDs = @("S-1-5-32-545", "S-1-1-0", "S-1-5-11", (Get-LocalUser -Name $env:UserName).SID.value)  # Пользователи Well-known SID + current user
 
     $Result = @{}
-    Get-ChildItem -Path $Path -File -Recurse -ErrorAction SilentlyContinue | foreach {
-        
-        try {
-            $tmp = _checkACL -acls $_.GetAccessControl().Access -aclref $lookupRights -sidref $lookupGroupSIDs
+    Get-ChildItem -Path $Path -Recurse -ErrorAction SilentlyContinue | foreach {
+        $item = $_
+        $tmp = $null
 
-            if ($tmp.count -ne 0) {
-                $Result.Add($_.FullName,  $tmp)
+        try {
+            if ($item.GetType().Name -eq "RegistryKey") {
+                $itemPath = $item.Name
+            } else {
+                $itemPath = $item.FullName             
+            }
+
+            $tmp = _checkACL -acls $item.GetAccessControl().Access -aclref $lookupRights -sidref $lookupGroupSIDs
+
+            if ($tmp.count -ne 0) {        
+                $Result.Add($itemPath,  $tmp)
+            
             }
         } catch {
             Write-Host ("Error with path '{0}'. Error: {1}" -f $_.FullName, $Error[0].Exception.Message)
         }
+        
 
-        Write-Verbose ("checking {0} accessable {1}" -f $_.FullName, $tmp.count)
+        
+
+        Write-Verbose ("checking {0} accessable {1}" -f $itemPath, $tmp.count)
     }
     return $Result
 }
@@ -97,4 +111,5 @@ $pathList | foreach {
     $tmp = CheckACLforPath -Path $_ -Verbose
     $r += ($tmp ) 
 }
+
 $r.keys | sort
