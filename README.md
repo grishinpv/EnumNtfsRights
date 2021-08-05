@@ -1,2 +1,2 @@
 # EnumNtfsRights
-Simple script to enum files with write permissions for current user
+Simple script to enum files or registry keys with write permissions for the current user
