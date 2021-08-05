@@ -35,7 +35,15 @@ function _checkACL {
                 if ($group.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -in $sidref)  {
 
                     foreach ($right in $aclref) {
-                        if ((($group.FileSystemRights -band $right) -eq $right ) -or (($group.RegistryRights -band $right) -eq $right )) {
+                        if ($item.GetType().Name -eq "RegistryKey") {
+                            $itemACL = $group.RegistryRights   
+                            if ($right -eq [System.Security.AccessControl.FileSystemRights]::WriteExtendedAttributes) {
+                                continue # registry does not have this right
+                            }
+                        } else {
+                            $itemACL = $group.FileSystemRights             
+                        }
+                        if (($itemACL -band $right) -eq $right ) {
                             $MatchedAccess += $right.ToString()
            
                         } 
